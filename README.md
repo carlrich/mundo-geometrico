@@ -56,7 +56,7 @@ No requiere instalación de servidores ni dependencias complejas.
 
 1.  **Clonar el repositorio:**
     ```bash
-    git clone [https://github.com/TU_USUARIO/mundo-geometrico.git](https://github.com/TU_USUARIO/mundo-geometrico.git)
+    git clone [https://github.com/TU_USUARIO/mundo-geometrico.git](https://github.com/carlrich/mundo-geometrico.git)
     ```
 2.  **Ejecutar:**
     Simplemente abre el archivo `index.html` en tu navegador web favorito (Chrome, Firefox, Edge, Safari).
@@ -66,4 +66,5 @@ No requiere instalación de servidores ni dependencias complejas.
 Este proyecto es de código abierto y está diseñado con fines educativos. Siéntete libre de usarlo y modificarlo.
 
 ---
+
 Desarrollado con ❤️ para aprender matemáticas jugando.

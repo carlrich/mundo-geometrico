@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mundo Geométrico - Menú Principal</title>
+  <link rel="shortcut icon" href="./logo.png" type="image/x-icon">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Fredoka', sans-serif; }
+
+    /* Fondo animado suave */
+    .menu-bg {
+      background-color: #f0f9ff;
+      background-image: 
+        radial-gradient(#bae6fd 2px, transparent 2px),
+        radial-gradient(#bae6fd 2px, transparent 2px);
+      background-size: 40px 40px;
+      background-position: 0 0, 20px 20px;
+      animation: moveBackground 60s linear infinite;
+    }
+
+    @keyframes moveBackground {
+      from { background-position: 0 0, 20px 20px; }
+      to { background-position: 40px 40px, 60px 60px; }
+    }
+
+    /* Tarjetas del Menú */
+    .game-card {
+      background: white;
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 4px solid transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none; /* Quitar subrayado de enlaces */
+    }
+
+    .game-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Colores específicos para cada tarjeta al hacer hover */
+    .card-angulos:hover { border-color: #3b82f6; }
+    .card-parejas:hover { border-color: #10b981; }
+    .card-transportador:hover { border-color: #f59e0b; }
+    .card-detective:hover { border-color: #8b5cf6; }
+
+    .icon-container {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3rem; margin-bottom: 1rem;
+      transition: transform 0.3s;
+    }
+    
+    .game-card:hover .icon-container { transform: scale(1.1) rotate(5deg); }
+
+    /* Colores de fondo de iconos */
+    .bg-icon-blue { background-color: #dbeafe; color: #2563eb; }
+    .bg-icon-green { background-color: #d1fae5; color: #059669; }
+    .bg-icon-yellow { background-color: #fef3c7; color: #d97706; }
+    .bg-icon-purple { background-color: #ede9fe; color: #7c3aed; }
+
+  </style>
+</head>
+
+<body class="menu-bg min-h-screen flex flex-col items-center justify-center p-6">
+
+  <header class="text-center mb-12 animate-fade-in-down">
+    <div class="inline-block p-4 bg-white rounded-full shadow-lg mb-4 transform hover:rotate-12 transition duration-500">
+      <span class="text-6xl">📐</span>
+    </div>
+    <h1 class="text-4xl md:text-6xl font-bold text-slate-800 mb-2 drop-shadow-sm">
+      Mundo Geométrico
+    </h1>
+    <p class="text-xl text-slate-500 font-medium max-w-2xl mx-auto">
+      ¡Diviértete aprendiendo geometría! Elige un juego para comenzar tu aventura matemática.
+    </p>
+  </header>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-7xl">
+
+    <a href="clasificador-angulos.html" class="game-card card-angulos group">
+      <div class="icon-container bg-icon-blue">
+        📐
+      </div>
+      <h2 class="text-2xl font-bold text-slate-700 mb-2 group-hover:text-blue-600 transition">
+        Clasificador
+      </h2>
+      <p class="text-slate-500 text-sm">
+        Aprende a distinguir entre ángulos agudos, rectos, obtusos y cóncavos.
+      </p>
+      <div class="mt-4 px-4 py-2 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
+        Nivel Básico
+      </div>
+    </a>
+
+    <a href="parejas-angulos.html" class="game-card card-parejas group">
+      <div class="icon-container bg-icon-green">
+        🤝
+      </div>
+      <h2 class="text-2xl font-bold text-slate-700 mb-2 group-hover:text-green-600 transition">
+        Parejas
+      </h2>
+      <p class="text-slate-500 text-sm">
+        Descubre cómo se relacionan los ángulos: complementarios y suplementarios.
+      </p>
+      <div class="mt-4 px-4 py-2 bg-green-50 text-green-600 rounded-full text-xs font-bold uppercase tracking-wider">
+        Nivel Intermedio
+      </div>
+    </a>
+
+    <a href="maestro-transportador.html" class="game-card card-transportador group">
+      <div class="icon-container bg-icon-yellow">
+        📏
+      </div>
+      <h2 class="text-2xl font-bold text-slate-700 mb-2 group-hover:text-yellow-600 transition">
+        Transportador
+      </h2>
+      <p class="text-slate-500 text-sm">
+        Usa la herramienta virtual para medir ángulos con precisión milimétrica.
+      </p>
+      <div class="mt-4 px-4 py-2 bg-yellow-50 text-yellow-700 rounded-full text-xs font-bold uppercase tracking-wider">
+        Práctica Real
+      </div>
+    </a>
+
+    <a href="detective-angulos.html" class="game-card card-detective group">
+      <div class="icon-container bg-icon-purple">
+        🕵️‍♂️
+      </div>
+      <h2 class="text-2xl font-bold text-slate-700 mb-2 group-hover:text-purple-600 transition">
+        Detective X
+      </h2>
+      <p class="text-slate-500 text-sm">
+        Usa tu lógica para calcular el valor desconocido de "X".
+      </p>
+      <div class="mt-4 px-4 py-2 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase tracking-wider">
+        Desafío Lógico
+      </div>
+    </a>
+
+  </div>
+
+  <footer class="mt-16 text-center text-slate-400 text-sm font-medium">
+    <p>Desarrollado para aprender jugando. ¡Las matemáticas son divertidas!</p>
+  </footer>
+
+</body>
+</html>

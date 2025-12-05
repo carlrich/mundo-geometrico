@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detective de Ángulos: Encuentra la X</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="shortcut icon" href="./logo.png" type="image/x-icon">
+
+  <style>
+    body { font-family: 'Fredoka', sans-serif; }
+
+    /* Fondo estilo "plano de arquitecto" o papel milimetrado */
+    .blueprint-bg {
+      background-color: #eef2ff;
+      background-image: 
+        linear-gradient(#c7d2fe 1px, transparent 1px),
+        linear-gradient(90deg, #c7d2fe 1px, transparent 1px);
+      background-size: 25px 25px;
+    }
+
+    .game-card {
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      border: 4px solid #818cf8; /* Color índigo */
+    }
+
+    /* Botones de respuesta */
+    .option-btn {
+      background-color: #f3f4f6;
+      border: 3px solid #d1d5db;
+      color: #374151;
+      font-size: 1.5rem;
+      font-weight: bold;
+      padding: 1rem;
+      border-radius: 16px;
+      transition: all 0.2s;
+    }
+    .option-btn:hover {
+      background-color: #e0e7ff;
+      border-color: #818cf8;
+      transform: translateY(-3px);
+    }
+    .option-btn:active { transform: scale(0.98); }
+
+    /* Animación de error */
+    .shake { animation: shake 0.5s; }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+    .heart { color: #ef4444; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); }
+    .lost-heart { color: #d1d5db; }
+  </style>
+</head>
+
+<body class="blueprint-bg min-h-screen flex justify-center items-center p-4">
+
+  <div class="game-card w-full max-w-2xl p-6 md:p-8 relative">
+    
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+      <div>
+        <span class="bg-indigo-100 text-indigo-700 px-4 py-1 rounded-full font-bold uppercase text-sm tracking-wider">
+          Nivel <span id="levelDisplay">1</span>/3
+        </span>
+         <span class="ml-2 text-slate-500 font-bold">Pregunta <span id="qNumDisplay">1</span>/10</span>
+      </div>
+      <h1 class="text-2xl font-bold text-indigo-800 text-center">🕵️‍♂️ Encuentra el valor de X</h1>
+      <div id="livesContainer" class="flex gap-1 text-2xl">
+        </div>
+    </div>
+
+    <div id="svgContainer" class="bg-slate-50 rounded-2xl border-2 border-slate-200 h-64 flex justify-center items-center mb-8 p-4 relative overflow-hidden">
+      </div>
+
+    <div id="optionsGrid" class="grid grid-cols-2 gap-4">
+      </div>
+
+  </div>
+
+  <script>
+    // --- CONFIGURACIÓN Y ESTADO DEL JUEGO ---
+    let currentQuestion = 0;
+    let score = 0;
+    let lives = 5;
+    const totalQuestions = 10;
+    let gameState = []; // Guardará las preguntas generadas
+
+    // --- SONIDOS (Opcional, reutilizando de juegos anteriores si los tienes) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = type; osc.frequency.value = freq;
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // --- GENERADOR DE PROBLEMAS MATEMÁTICOS ---
+    function generateQuestions() {
+        let q = [];
+        // Nivel 1: Complementarios (Suman 90) - 3 preguntas
+        for(let i=0; i<3; i++) {
+            let known = Math.floor(Math.random() * 60) + 15; // Entre 15 y 75
+            let x = 90 - known;
+            q.push({ type: 90, angles: [known], xVal: x, distractors: generateDistractors(x) });
+        }
+        // Nivel 2: Suplementarios (Suman 180) - 4 preguntas
+        for(let i=0; i<4; i++) {
+             let known = Math.floor(Math.random() * 120) + 30; // Entre 30 y 150
+             let x = 180 - known;
+             q.push({ type: 180, angles: [known], xVal: x, distractors: generateDistractors(x) });
+        }
+        // Nivel 3: Vuelta completa (Suman 360) - 3 preguntas
+        for(let i=0; i<3; i++) {
+            let a = Math.floor(Math.random() * 100) + 50;
+            let b = Math.floor(Math.random() * 100) + 50;
+            let x = 360 - a - b;
+            q.push({ type: 360, angles: [a, b], xVal: x, distractors: generateDistractors(x) });
+        }
+        return q;
+    }
+
+    function generateDistractors(correctX) {
+        let arr = [correctX];
+        while(arr.length < 4) {
+            // Generar distractores cercanos (+-10, +-20, o errores comunes de cálculo)
+            let offset = (Math.floor(Math.random() * 4) + 1) * 10; // 10, 20, 30, 40
+            let sign = Math.random() > 0.5 ? 1 : -1;
+            let dist = correctX + (offset * sign);
+            if(dist > 0 && !arr.includes(dist) && dist < 360) {
+                arr.push(dist);
+            }
+        }
+        return arr.sort(() => Math.random() - 0.5); // Barajar
+    }
+
+    // --- DIBUJANTE SVG ---
+    function drawAngleProblem(questionData) {
+        const size = 220;
+        const cx = size / 2; const cy = size / 2 + 20; // Centro un poco bajado
+        const r = 80; // Radio de las líneas
+        let svgContent = '';
+        let currentAngle = 0;
+
+        // Función auxiliar para calcular coordenadas
+        const getCoords = (deg) => ({
+            x: cx + r * Math.cos(deg * Math.PI / 180),
+            y: cy - r * Math.sin(deg * Math.PI / 180) // Y invertida en SVG
+        });
+
+        // Dibujar líneas base según el tipo
+        if (questionData.type === 90) {
+            // Forma de L
+            svgContent += `<line x1="${cx}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#334155" stroke-width="3"/>`;
+            svgContent += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy-r}" stroke="#334155" stroke-width="3"/>`;
+            // Cuadradito de 90 grados
+            svgContent += `<rect x="${cx}" y="${cy-15}" width="15" height="15" fill="none" stroke="#ef4444" stroke-width="2"/>`;
+            currentAngle = 0;
+        } else if (questionData.type === 180) {
+            // Línea recta
+            svgContent += `<line x1="${cx-r}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#334155" stroke-width="3"/>`;
+            currentAngle = 0;
+        } else {
+            // 360 grados, línea base inicial
+             svgContent += `<line x1="${cx}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#334155" stroke-width="3"/>`;
+        }
+
+        // Dibujar los rayos intermedios y las etiquetas
+        let anglesToDraw = [...questionData.angles, 'X']; // [30, 'X']
+        
+        anglesToDraw.forEach((val, idx) => {
+            let angleSpan = (val === 'X') ? questionData.xVal : val;
+            let endAngle = currentAngle + angleSpan;
+            
+            // Dibujar el rayo divisor (excepto el último que cierra en 90/180/360)
+            if(idx < anglesToDraw.length -1 || questionData.type === 360) {
+                 const p = getCoords(endAngle);
+                 svgContent += `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="#334155" stroke-width="2"/>`;
+            }
+
+            // Dibujar el arco y el texto
+            const midAngle = currentAngle + angleSpan / 2;
+            const textPos = getCoords(midAngle);
+            // Ajustar posición texto un poco más lejos
+            const tx = cx + (r + 25) * Math.cos(midAngle * Math.PI / 180);
+            const ty = cy - (r + 25) * Math.sin(midAngle * Math.PI / 180);
+            
+            let textColor = val === 'X' ? '#ef4444' : '#3b82f6';
+            let textContent = val === 'X' ? 'X' : val + '°';
+            
+            // Arco simple (path)
+            const startArc = getCoords(currentAngle);
+            const endArc = getCoords(endAngle);
+            const largeArc = angleSpan > 180 ? 1 : 0;
+            // M startX startY A radius radius 0 largeArc sweepFlag endX endY
+            // Nota: sweepFlag 0 porque vamos en sentido antihorario matemático, pero Y está invertida en SVG.
+            svgContent += `<path d="M ${cx + 30 * Math.cos(currentAngle * Math.PI/180)} ${cy - 30 * Math.sin(currentAngle * Math.PI/180)} A 30 30 0 ${largeArc} 0 ${cx + 30 * Math.cos(endAngle * Math.PI/180)} ${cy - 30 * Math.sin(endAngle * Math.PI/180)}" fill="none" stroke="${textColor}" stroke-width="2"/>`;
+            
+            svgContent += `<text x="${tx}" y="${ty}" fill="${textColor}" font-size="18" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${textContent}</text>`;
+
+            currentAngle = endAngle;
+        });
+        
+        // Vértice central
+        svgContent += `<circle cx="${cx}" cy="${cy}" r="4" fill="#334155"/>`;
+
+        return `<svg viewBox="0 0 ${size} ${size}" class="w-full h-full">${svgContent}</svg>`;
+    }
+
+    // --- LÓGICA DEL JUEGO ---
+    function updateUI() {
+        // Actualizar Vidas
+        const livesContainer = document.getElementById('livesContainer');
+        livesContainer.innerHTML = '';
+        for(let i=0; i<5; i++) {
+            livesContainer.innerHTML += i < lives ? '<span class="heart">❤</span>' : '<span class="lost-heart">❤</span>';
+        }
+
+        // Actualizar Nivel y número de pregunta
+        let level = 1;
+        if(currentQuestion >= 3) level = 2;
+        if(currentQuestion >= 7) level = 3;
+        document.getElementById('levelDisplay').innerText = level;
+        document.getElementById('qNumDisplay').innerText = currentQuestion + 1;
+    }
+
+    function loadQuestion() {
+        if(currentQuestion >= totalQuestions || lives <= 0) {
+            endGame();
+            return;
+        }
+        
+        updateUI();
+        const qData = gameState[currentQuestion];
+        
+        // Dibujar SVG
+        document.getElementById('svgContainer').innerHTML = drawAngleProblem(qData);
+        
+        // Crear botones
+        const grid = document.getElementById('optionsGrid');
+        grid.innerHTML = '';
+        qData.distractors.forEach(val => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = val + '°';
+            btn.onclick = () => checkAnswer(val, qData.xVal, btn);
+            grid.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(selectedVal, correctVal, btnElement) {
+        // Deshabilitar botones temporalmente
+        document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+
+        if(selectedVal === correctVal) {
+            // Correcto
+            btnElement.style.backgroundColor = '#dcfce7';
+            btnElement.style.borderColor = '#22c55e';
+            btnElement.style.color = '#166534';
+            playTone(600, 'triangle', 0.2);
+            confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+            score += 2; // 2 puntos por acierto
+            setTimeout(() => {
+                currentQuestion++;
+                loadQuestion();
+            }, 1200);
+        } else {
+            // Incorrecto
+            btnElement.style.backgroundColor = '#fee2e2';
+            btnElement.style.borderColor = '#ef4444';
+            btnElement.style.color = '#991b1b';
+            btnElement.classList.add('shake');
+            playTone(200, 'sawtooth', 0.3);
+            lives--;
+            updateUI();
+            
+            if(lives === 0) {
+                 setTimeout(endGame, 1000);
+            } else {
+                 setTimeout(() => {
+                    currentQuestion++;
+                    loadQuestion();
+                }, 1200);
+            }
+        }
+    }
+
+    function endGame() {
+        let title, text, icon;
+        if (lives > 0) {
+            title = "¡Misión Cumplida! 🕵️‍♂️✨";
+            text = `Has resuelto los casos. Tu nota final es: <b>${score} sobre 20</b>.`;
+            icon = "success";
+            confetti({ particleCount: 200, spread: 120, origin: { y: 0.6 } });
+        } else {
+            title = "¡Oh no! Se acabaron las vidas 💔";
+            text = `Buen intento detective. Tu nota final es: <b>${score} sobre 20</b>.`;
+            icon = "error";
+        }
+
+        Swal.fire({
+            title: title,
+            html: text,
+            icon: icon,
+            confirmButtonText: 'Jugar de Nuevo',
+            confirmButtonColor: '#818cf8',
+            allowOutsideClick: false
+        }).then(() => {
+            startGame();
+        });
+    }
+
+    function startGame() {
+        currentQuestion = 0;
+        score = 0;
+        lives = 5;
+        gameState = generateQuestions();
+        loadQuestion();
+    }
+
+    // Iniciar el juego al cargar
+    startGame();
+
+  </script>
+</body>
+</html>

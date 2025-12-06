@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Desafío de Ángulos: Nivel 2</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Fredoka', sans-serif; }
+    .blueprint-bg {
+      background-color: #eef2ff;
+      background-image: linear-gradient(#c7d2fe 1px, transparent 1px), linear-gradient(90deg, #c7d2fe 1px, transparent 1px);
+      background-size: 25px 25px;
+    }
+    .game-card {
+      background: white; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border: 4px solid #818cf8;
+    }
+    .option-btn {
+      background-color: #f3f4f6; border: 3px solid #d1d5db; color: #374151; font-size: 1.5rem; font-weight: bold; padding: 1rem; border-radius: 16px; transition: all 0.2s;
+    }
+    .option-btn:hover:not([disabled]) { background-color: #e0e7ff; border-color: #818cf8; transform: translateY(-3px); }
+    .option-btn:active:not([disabled]) { transform: scale(0.98); }
+    /* Estilo deshabilitado */
+    .option-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+    
+    .shake { animation: shake 0.5s; } @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    .heart { color: #ef4444; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); }
+    .lost-heart { color: #d1d5db; }
+
+    .solution-box { background: #fff7ed; border: 3px solid #fdba74; padding: 1.5rem; border-radius: 16px; margin-bottom: 1rem; font-family: monospace; font-size: 1.1rem; color: #7c2d12; }
+    .math-step { margin-bottom: 0.5rem; }
+    .math-final { font-weight: bold; color: #ea580c; margin-top: 1rem; }
+  </style>
+</head>
+
+<body class="blueprint-bg min-h-screen flex justify-center items-center p-4">
+
+  <div class="game-card w-full max-w-3xl p-6 md:p-8 relative">
+    
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+      <div>
+        <a href="../index.html" class="text-slate-400 hover:text-purple-600 font-bold mr-4 text-sm">⬅ Salir</a>
+        <span class="bg-purple-100 text-purple-700 px-4 py-1 rounded-full font-bold uppercase text-sm tracking-wider">Nivel 2</span>
+         <span class="ml-2 text-slate-500 font-bold">Pregunta <span id="qNumDisplay">1</span>/10</span>
+      </div>
+      <h1 class="text-2xl font-bold text-purple-800 text-center">📐 Desafío de Ángulos</h1>
+      <div id="livesContainer" class="flex gap-1 text-2xl"></div>
+    </div>
+
+    <p id="questionPrompt" class="text-center text-slate-600 font-bold mb-2"></p>
+
+    <div id="svgContainer" class="bg-slate-50 rounded-2xl border-2 border-slate-200 h-64 flex justify-center items-center mb-6 p-4 relative overflow-hidden"></div>
+
+    <div id="solutionContainer" class="hidden solution-box mb-6"></div>
+
+    <div class="text-center mb-6 h-12 flex justify-center items-center">
+      <button id="showSolutionBtn" onclick="showSolution()" class="bg-orange-100 text-orange-600 px-6 py-2 rounded-full font-bold hover:bg-orange-200 transition flex items-center gap-2 border-2 border-orange-200">
+        💡 Ver Solución
+      </button>
+      
+      <button id="nextQuestionBtn" onclick="manualNext()" class="hidden bg-indigo-500 text-white px-8 py-3 rounded-full font-bold hover:bg-indigo-600 transition shadow-lg flex items-center gap-2 transform hover:scale-105">
+        Siguiente Pregunta ➡
+      </button>
+    </div>
+
+    <div id="optionsGrid" class="grid grid-cols-2 gap-4"></div>
+
+  </div>
+
+  <script>
+    // --- CONFIGURACIÓN ---
+    let currentQuestion = 0;
+    let score = 0;
+    let lives = 5;
+    const totalQuestions = 10;
+    let gameState = [];
+    let isSolutionShown = false;
+
+    // --- SONIDOS ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // --- GENERADOR DE ECUACIONES Y PROBLEMAS ---
+    function generateAdvancedQuestions() {
+        let q = [];
+        
+        // 1. ÁNGULOS COMPLEMENTARIOS (Suma = 90°) - 2 preguntas
+        for(let i=0; i<2; i++) {
+            // Ecuación tipo: ax + b + cx = 90
+            let x = getRandomInt(5, 15);
+            let a = getRandomInt(1, 3);
+            let c = getRandomInt(1, 2);
+            let totalX = a + c;
+            let constant = 90 - (totalX * x);
+            
+            if (constant < 0 || constant % 5 !== 0) { i--; continue; } // Reintentar para números bonitos
+
+            let labels = [
+                a === 1 ? 'x' : `${a}x`, 
+                c === 1 ? (constant > 0 ? `x + ${constant}°` : `x - ${Math.abs(constant)}°`) : (constant > 0 ? `${c}x + ${constant}°` : `${c}x`)
+            ];
+            if (constant === 0 && c > 1) labels[1] = `${c}x`;
+
+            // Calcular valores reales para el dibujo
+            let angle1 = a * x;
+            let angle2 = c * x + constant;
+            
+            let solutionSteps = [
+                `Ángulo recto suma 90°`,
+                `${labels[0]} + ${labels[1].replace('°','')} = 90`,
+                `${a+c}x ${constant >= 0 ? '+ ' + constant : constant} = 90`,
+                `${a+c}x = 90 - (${constant})`,
+                `${a+c}x = ${90 - constant}`,
+                `x = ${90 - constant} / ${a+c}`
+            ];
+
+            q.push({ type: 90, angles: [angle1, angle2], labels: labels, xVal: x, solution: solutionSteps, prompt: 'Hallar x si el ángulo es recto (90°):' });
+        }
+
+        // 2. ÁNGULOS SUPLEMENTARIOS (Suma = 180°) - 3 preguntas
+        for(let i=0; i<3; i++) {
+            // Variedad: ax + bx - k + cx = 180
+            let x = getRandomInt(10, 25);
+            let totalX = getRandomInt(4, 6); // Ej 5x
+            let constant = 180 - (totalX * x); // Lo que sobra
+            
+            // Distribuir totalX en 2 o 3 ángulos
+            let angles = [], labels = [];
+            let currentX = 0;
+            
+            // Angulo 1
+            let a1 = Math.floor(totalX / 2);
+            let c1 = getRandomInt(-20, 20);
+            let val1 = a1 * x + c1;
+            angles.push(val1);
+            labels.push(`${a1}x ${c1 >= 0 ? '+ '+c1 : c1}°`);
+            
+            // Angulo 2 (El resto)
+            let a2 = totalX - a1;
+            let c2 = constant - c1;
+            let val2 = a2 * x + c2;
+            angles.push(val2);
+            labels.push(`${a2}x ${c2 >= 0 ? '+ '+c2 : c2}°`);
+
+            if (val1 <= 10 || val2 <= 10) { i--; continue; } // Evitar ángulos imposibles
+
+            let solutionSteps = [
+                `Ángulo llano suma 180°`,
+                `(${labels[0]}) + (${labels[1]}) = 180`,
+                `${totalX}x ${constant >= 0 ? '+ ' + constant : constant} = 180`,
+                `${totalX}x = 180 - (${constant})`,
+                `${totalX}x = ${180 - constant}`,
+                `x = ${(180 - constant) / totalX}`
+            ];
+
+            q.push({ type: 180, angles: angles, labels: labels, xVal: x, solution: solutionSteps, prompt: 'Hallar x en el ángulo llano:' });
+        }
+
+        // 3. VUELTA COMPLETA (360°) - 2 preguntas
+        for(let i=0; i<2; i++) {
+            let x = getRandomInt(15, 30);
+            let knownAngle = getRandomInt(90, 150);
+            let knownAngle2 = getRandomInt(60, 100);
+            // Ecuación: ax + known + known2 = 360
+            let remainder = 360 - knownAngle - knownAngle2;
+            let a = remainder / x;
+            
+            if (!Number.isInteger(a) || a < 2) { i--; continue; }
+
+            let solutionSteps = [
+                `Una vuelta completa suma 360°`,
+                `${a}x + ${knownAngle} + ${knownAngle2} = 360`,
+                `${a}x + ${knownAngle + knownAngle2} = 360`,
+                `${a}x = 360 - ${knownAngle + knownAngle2}`,
+                `${a}x = ${remainder}`,
+                `x = ${x}`
+            ];
+
+            q.push({ type: 360, angles: [remainder, knownAngle, knownAngle2], labels: [`${a}x`, knownAngle+'°', knownAngle2+'°'], xVal: x, solution: solutionSteps, prompt: 'Hallar x (Vuelta completa):' });
+        }
+
+        // 4. BISECTRIZ COMPLEJA (Igualación) - 3 preguntas
+        for(let i=0; i<3; i++) {
+            // Generar ecuación: ax + b = cx - d
+            // Ejemplo: 3x + 10 = 5x - 20 -> 30 = 2x -> x = 15
+            let x = getRandomInt(10, 25);
+            
+            // Lado A (Pequeño): ax + b
+            let a = getRandomInt(2, 3);
+            let b = getRandomInt(10, 40);
+            let angleVal = a * x + b;
+            
+            // Lado B (Grande): cx - d (debe dar el mismo angleVal)
+            let c = getRandomInt(a + 1, a + 3); // c debe ser mayor que a
+            let d = (c * x) - angleVal; // Calculamos d para que cuadre
+
+            let labelA = `${a}x + ${b}°`;
+            let labelB = `${c}x - ${d}°`;
+            
+            let solutionSteps = [
+                `Bisectriz: Los ángulos son iguales`,
+                `${labelB} = ${labelA}`,
+                `${c}x - ${a}x = ${b} + ${d}`,
+                `${c-a}x = ${b+d}`,
+                `x = ${(b+d) / (c-a)}`
+            ];
+
+            let labels = [labelA, labelB];
+            if(Math.random() > 0.5) labels.reverse();
+
+            q.push({ type: 'bisectriz', angles: [angleVal, angleVal], labels: labels, xVal: x, solution: solutionSteps, prompt: 'OM es bisectriz. Calcula x:' });
+        }
+
+        return q.sort(() => Math.random() - 0.5);
+    }
+
+    function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    function generateDistractors(correctX) {
+        let arr = [correctX];
+        while(arr.length < 4) {
+            let offset = getRandomInt(1, 5) * (Math.random() > 0.5 ? 2 : -2); // +-2, +-4...
+            let dist = correctX + offset;
+            if(dist > 5 && !arr.includes(dist)) arr.push(dist);
+        }
+        return arr.sort(() => Math.random() - 0.5);
+    }
+
+    // --- DIBUJANTE SVG VERSÁTIL ---
+    function drawAdvancedProblem(qData) {
+        const size = 320; 
+        const cx = size/2; 
+        const cy = size/2 + 20; 
+        const r = 110;
+        let svg = ''; 
+        let currentAngle = 0;
+        
+        const getCoords = (deg) => ({ 
+            x: cx + r * Math.cos(deg*Math.PI/180), 
+            y: cy - r * Math.sin(deg*Math.PI/180) 
+        });
+
+        // 1. DIBUJAR ESTRUCTURA BASE
+        if (qData.type === 90) {
+            // Angulo recto base L
+            svg += `<line x1="${cx}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>`; // Base derecha
+            svg += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy-r}" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>`; // Vertical arriba
+            // Cuadradito
+            svg += `<rect x="${cx}" y="${cy-15}" width="15" height="15" fill="none" stroke="#ef4444" stroke-width="2"/>`;
+            currentAngle = 90; // Empezamos desde arriba (90 grados matemáticos)
+        }
+        else if (qData.type === 180) {
+            // Línea recta
+            svg += `<line x1="${cx-r-15}" y1="${cy}" x2="${cx+r+15}" y2="${cy}" stroke="#334155" stroke-width="3" stroke-linecap="round"/>`;
+            currentAngle = 180; 
+        } 
+        else if (qData.type === 360) {
+            // Punto central con rayos saliendo
+            currentAngle = 0; // Empezamos en 0 y damos la vuelta
+        }
+        else if (qData.type === 'bisectriz') {
+             let totalAngle = qData.angles[0] + qData.angles[1];
+             let startDeg = 90 + (totalAngle / 2);
+             const pA = getCoords(startDeg); 
+             const pB = getCoords(startDeg - totalAngle);
+             
+             svg += `<line x1="${cx}" y1="${cy}" x2="${pA.x}" y2="${pA.y}" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>`;
+             svg += `<line x1="${cx}" y1="${cy}" x2="${pB.x}" y2="${pB.y}" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>`;
+             
+             // Etiquetas A, B, O
+             svg += `<text x="${pA.x}" y="${pA.y-10}" fill="#334155" font-weight="bold" font-size="14">A</text>`;
+             svg += `<text x="${pB.x}" y="${pB.y-10}" fill="#334155" font-weight="bold" font-size="14">B</text>`;
+             svg += `<text x="${cx}" y="${cy+20}" fill="#334155" font-weight="bold" font-size="14">O</text>`;
+
+             currentAngle = startDeg;
+        }
+
+        // 2. DIBUJAR RAYOS Y ARCOS
+        qData.angles.forEach((val, idx) => {
+            let endAngle = currentAngle - val; 
+            
+            // Dibujar Rayo Divisor (Evitar redibujar bordes base en 90/180)
+            let skipLine = false;
+            if (qData.type === 90 && idx === qData.angles.length-1) skipLine = true; 
+            if (qData.type === 180 && idx === qData.angles.length-1) skipLine = true;
+
+            if (!skipLine || qData.type === 360 || (qData.type === 'bisectriz' && idx === 0)) {
+                 const p = getCoords(endAngle);
+                 let isBisectorLine = (qData.type === 'bisectriz' && idx === 0);
+                 
+                 svg += `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="#334155" stroke-width="2" stroke-dasharray="${isBisectorLine ? '6,4' : ''}" marker-end="url(#arrow)"/>`;
+                 
+                 if(isBisectorLine) svg += `<text x="${p.x}" y="${p.y-10}" fill="#334155" font-weight="bold" font-size="14">M</text>`;
+            }
+
+            // Arco y Texto
+            const midAngle = currentAngle - val/2;
+            const arcR = 40 + (idx%3)*15; // Variar radio para que no se amontonen
+            
+            const x1 = cx + arcR * Math.cos(currentAngle*Math.PI/180);
+            const y1 = cy - arcR * Math.sin(currentAngle*Math.PI/180);
+            const x2 = cx + arcR * Math.cos(endAngle*Math.PI/180);
+            const y2 = cy - arcR * Math.sin(endAngle*Math.PI/180);
+            
+            // Arcos grandes para 360
+            const largeArc = val > 180 ? 1 : 0;
+            svg += `<path d="M ${x1} ${y1} A ${arcR} ${arcR} 0 ${largeArc} 1 ${x2} ${y2}" fill="none" stroke="#3b82f6" stroke-width="2"/>`;
+            
+            // Texto
+            const labelR = arcR + 25;
+            const tx = cx + labelR * Math.cos(midAngle * Math.PI / 180);
+            const ty = cy - labelR * Math.sin(midAngle * Math.PI / 180);
+            
+            let labelText = qData.labels[idx];
+            // Limpiar texto para SVG si es muy largo
+            let fontSize = labelText.length > 5 ? 14 : 16;
+            
+            svg += `<text x="${tx}" y="${ty}" fill="#1d4ed8" font-size="${fontSize}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${labelText}</text>`;
+
+            currentAngle = endAngle;
+        });
+
+        // Vértice central
+        svg += `<circle cx="${cx}" cy="${cy}" r="4" fill="#334155"/>`;
+
+        const defs = `<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#334155" /></marker></defs>`;
+        return `<svg viewBox="0 0 ${size} ${size}" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">${defs}${svg}</svg>`;
+    }
+
+    // --- INTERFAZ Y CONTROL (Sin cambios mayores, solo integración) ---
+    function updateUI() {
+        document.getElementById('livesContainer').innerHTML = Array(5).fill(0).map((_,i) => i < lives ? '<span class="heart">❤</span>' : '<span class="lost-heart">❤</span>').join('');
+        document.getElementById('qNumDisplay').innerText = currentQuestion + 1;
+        document.getElementById('solutionContainer').style.display = 'none'; // Importante usar style.display
+        document.getElementById('showSolutionBtn').style.display = 'flex';
+        document.getElementById('nextQuestionBtn').classList.add('hidden');
+        document.querySelectorAll('.option-btn').forEach(b => b.disabled = false);
+        isSolutionShown = false;
+    }
+
+    function showSolution() {
+        if(isSolutionShown) return;
+        isSolutionShown = true;
+        document.getElementById('showSolutionBtn').style.display = 'none';
+        
+        const solCont = document.getElementById('solutionContainer');
+        const qData = gameState[currentQuestion];
+        
+        let html = `<div style="font-weight:bold; margin-bottom:10px; color:#ea580c">Paso a paso:</div>`;
+        qData.solution.forEach(step => html += `<div style="margin-bottom: 5px;">• ${step}</div>`);
+        html += `<div class="math-final">∴ x = ${qData.xVal}°</div>`;
+        
+        solCont.innerHTML = html;
+        solCont.style.display = 'block'; // Forzar display block
+        solCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+        playTone(200, 'sawtooth', 0.3);
+        lives--;
+        document.getElementById('livesContainer').innerHTML = Array(5).fill(0).map((_,i) => i < lives ? '<span class="heart">❤</span>' : '<span class="lost-heart">❤</span>').join('');
+
+        const nextBtn = document.getElementById('nextQuestionBtn');
+        nextBtn.classList.remove('hidden');
+        if (lives === 0) { nextBtn.innerText = "Ver Resultado Final 🏁"; nextBtn.onclick = endGame; }
+    }
+
+    function manualNext() {
+        if(lives === 0) endGame();
+        else { currentQuestion++; loadQuestion(); }
+    }
+
+    function loadQuestion() {
+        if(currentQuestion >= totalQuestions || lives <= 0) { endGame(); return; }
+        updateUI();
+        const qData = gameState[currentQuestion];
+        document.getElementById('questionPrompt').innerText = qData.prompt;
+        document.getElementById('svgContainer').innerHTML = drawAdvancedProblem(qData);
+        
+        const grid = document.getElementById('optionsGrid'); grid.innerHTML = '';
+        generateDistractors(qData.xVal).forEach(val => {
+            const btn = document.createElement('button'); btn.className = 'option-btn'; btn.innerText = val + '°';
+            btn.onclick = () => checkAnswer(val, qData.xVal, btn);
+            grid.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(selectedVal, correctVal, btn) {
+        if(isSolutionShown) return; 
+        document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+        document.getElementById('showSolutionBtn').style.display = 'none';
+
+        if(selectedVal === correctVal) {
+            btn.style.backgroundColor = '#dcfce7'; btn.style.borderColor = '#22c55e'; btn.style.color = '#166534';
+            playTone(600, 'triangle', 0.2); confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+            score += 2;
+            setTimeout(() => { currentQuestion++; loadQuestion(); }, 1500);
+        } else {
+            btn.style.backgroundColor = '#fee2e2'; btn.style.borderColor = '#ef4444'; btn.style.color = '#991b1b'; btn.classList.add('shake');
+            playTone(200, 'sawtooth', 0.3);
+            lives--; 
+            document.getElementById('livesContainer').innerHTML = Array(5).fill(0).map((_,i) => i < lives ? '<span class="heart">❤</span>' : '<span class="lost-heart">❤</span>').join('');
+            setTimeout(() => { if(lives === 0) endGame(); else { currentQuestion++; loadQuestion(); } }, 1500);
+        }
+    }
+
+    function endGame() {
+        let title = lives > 0 ? "¡Misión Cumplida! 📐✨" : "¡Fin del Juego! 💔";
+        let text = `Tu puntuación final es: <b>${score} sobre 20</b>.`;
+        let icon = lives > 0 ? "success" : "error";
+        if(lives>0) confetti({ particleCount: 200, spread: 120, origin: { y: 0.6 } });
+        Swal.fire({ title, html: text, icon, confirmButtonText: 'Volver a intentar', confirmButtonColor: '#818cf8', allowOutsideClick: false }).then(startGame);
+    }
+
+    function startGame() {
+        currentQuestion = 0; score = 0; lives = 5;
+        gameState = generateAdvancedQuestions();
+        loadQuestion();
+    }
+
+    window.onload = startGame;
+  </script>
+</body>
+</html>
